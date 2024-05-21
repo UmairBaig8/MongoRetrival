@@ -1,0 +1,157 @@
+import openai
+from pymongo import MongoClient
+import json
+
+openai.api_key = "<OPENAI_API_KEY>"  # Replace it with OPENAI_API_KEY
+
+# Connect to MongoDB
+client = MongoClient("<MongoURL>")  # Replace it with MongoDB Atlas URL
+
+# Access the database and collection
+db = client['<Database>']  # Replace it with database name  
+collection = "<Collection>"  # Replace it with collection name  
+
+# Run OpenAI Completion API
+def fetchData(prompt: str, engine: str):
+
+    response = openai.Completion.create(
+        model=engine,
+        prompt=prompt,
+        temperature=0.5,
+        max_tokens=1707,
+        top_p=1,
+        best_of=2,
+        frequency_penalty=0,
+        presence_penalty=0,
+    )
+
+    return response.choices[0].text
+
+# To fetch collection schema
+def fetchSchema(collectionName: str):
+    collection = db[collectionName]  
+
+    pipeline = [
+        {"$project": {
+            "field_types": {
+                "$objectToArray": "$$ROOT"
+            }
+        }},
+        {"$unwind": "$field_types"},
+        {"$group": {
+            "_id": "$field_types.k",
+            "types": {"$addToSet": {"type": {"$type": "$field_types.v"}}}
+        }}
+    ]
+    # Run the aggregation pipeline
+    aggregation_results = collection.aggregate(pipeline)
+
+    return str(list(aggregation_results))
+
+# To run aggregation
+def runAggregation(collectionName: str, aggregation: str):
+    collection = db[collectionName]  
+    pipeline = json.loads(str(aggregation))
+    # Run the aggregation pipeline
+    aggregation_results = collection.aggregate(pipeline)
+
+    return str(list(aggregation_results))
+
+# Collection schema
+schema = fetchSchema(collection)
+
+print(f"Schema : {schema}")
+query = input('Query:') 
+
+engine = "gpt-3.5-turbo-instruct"  # OpenAI Engine
+prompt = f"Collection: { collection } Schema: { schema }, Please provide a mongo aggregation for { query } with each json key encoded with double quotes and if not found return 'Schema not Found!'"
+
+output = fetchData( prompt, engine )
+print(f"Output: { output }")
+
+result = runAggregation(collection, output)
+print(f"Result: { result }")
+prompt2 = f"Answere the query: { query } from result: { result }, in human readable format "
+answere = fetchData( prompt2, engine )
+print(f"Answere: { answere }")
+
+
+###############################################################################################################
+# Schema : [{'_id': '_id', 'types': [{'type': 'objectId'}]}, {'_id': 'customer', 'types': [{'type': 'object'}]}, {'_id': 'storeLocation', 'types': [{'type': 'string'}]}, {'_id': 'saleDate', 'types': [{'type': 'date'}]}, {'_id': 'purchaseMethod', 'types': [{'type': 'string'}]}, {'_id': 'items', 'types': [{'type': 'array'}]}, {'_id': 'couponUsed', 'types': [{'type': 'bool'}]}]
+# Query: Can I get uniqe store locations?
+# Output: 
+
+# [
+#   {
+#     "$match": {
+#       "storeLocation": {
+#         "$exists": true
+#       }
+#     }
+#   },
+#   {
+#     "$group": {
+#       "_id": "$storeLocation"
+#     }
+#   },
+#   {
+#     "$project": {
+#       "_id": 0,
+#       "storeLocation": "$_id"
+#     }
+#   },
+#   {
+#     "$group": {
+#       "_id": null,
+#       "storeLocations": {
+#         "$push": "$storeLocation"
+#       }
+#     }
+#   },
+#   {
+#     "$project": {
+#       "_id": 0,
+#       "storeLocations": 1
+#     }
+#   },
+#   {
+#     "$unwind": {
+#       "path": "$storeLocations",
+#       "preserveNullAndEmptyArrays": true
+#     }
+#   },
+#   {
+#     "$group": {
+#       "_id": null,
+#       "storeLocations": {
+#         "$addToSet": "$storeLocations"
+#       }
+#     }
+#   },
+#   {
+#     "$project": {
+#       "_id": 0,
+#       "storeLocations": 1
+#     }
+#   },
+#   {
+#     "$project": {
+#       "storeLocations": {
+#         "$map": {
+#           "input": "$storeLocations",
+#           "as": "location",
+#           "in": {
+#             "$concat": [
+#               "\"",
+#               "$$location",
+#               "\""
+#             ]
+#           }
+#         }
+#       }
+#     }
+#   }
+# ]
+# Result: [{'storeLocations': ['"New York"', '"Denver"', '"Austin"', '"London"', '"San Diego"', '"Seattle"']}]
+# Answere: 
+# Yes, you can get unique store locations from the given result. The unique store locations are: New York, Denver, Austin, London, San Diego, and Seattle.

@@ -76,82 +76,45 @@ answere = fetchData( prompt2, engine )
 print(f"Answere: { answere }")
 
 
-###############################################################################################################
-# Schema : [{'_id': '_id', 'types': [{'type': 'objectId'}]}, {'_id': 'customer', 'types': [{'type': 'object'}]}, {'_id': 'storeLocation', 'types': [{'type': 'string'}]}, {'_id': 'saleDate', 'types': [{'type': 'date'}]}, {'_id': 'purchaseMethod', 'types': [{'type': 'string'}]}, {'_id': 'items', 'types': [{'type': 'array'}]}, {'_id': 'couponUsed', 'types': [{'type': 'bool'}]}]
-# Query: Can I get uniqe store locations?
+# ###############################################################################################################
+# Schema : [{'_id': 'items', 'types': [{'type': 'array'}]}, {'_id': 'customer', 'types': [{'type': 'object'}]}, {'_id': 'storeLocation', 'types': [{'type': 'string'}]}, {'_id': '_id', 'types': [{'type': 'objectId'}]}, {'_id': 'couponUsed', 'types': [{'type': 'bool'}]}, {'_id': 'saleDate', 'types': [{'type': 'date'}]}, {'_id': 'purchaseMethod', 'types': [{'type': 'string'}]}]
+# Query:Can I get all items names available purchase methos as Online and coupon not used?
 # Output: 
-
 # [
 #   {
+#     "$project": {
+#       "_id": 0,
+#       "items": 1,
+#       "purchaseMethod": 1,
+#       "couponUsed": 1
+#     }
+#   },
+#   {
 #     "$match": {
-#       "storeLocation": {
-#         "$exists": true
-#       }
+#       "purchaseMethod": "Online",
+#       "couponUsed": false
 #     }
 #   },
 #   {
-#     "$group": {
-#       "_id": "$storeLocation"
-#     }
-#   },
-#   {
-#     "$project": {
-#       "_id": 0,
-#       "storeLocation": "$_id"
-#     }
+#     "$unwind": "$items"
 #   },
 #   {
 #     "$group": {
 #       "_id": null,
-#       "storeLocations": {
-#         "$push": "$storeLocation"
+#       "items": {
+#         "$addToSet": "$items.name"
 #       }
 #     }
 #   },
 #   {
 #     "$project": {
 #       "_id": 0,
-#       "storeLocations": 1
-#     }
-#   },
-#   {
-#     "$unwind": {
-#       "path": "$storeLocations",
-#       "preserveNullAndEmptyArrays": true
-#     }
-#   },
-#   {
-#     "$group": {
-#       "_id": null,
-#       "storeLocations": {
-#         "$addToSet": "$storeLocations"
-#       }
-#     }
-#   },
-#   {
-#     "$project": {
-#       "_id": 0,
-#       "storeLocations": 1
-#     }
-#   },
-#   {
-#     "$project": {
-#       "storeLocations": {
-#         "$map": {
-#           "input": "$storeLocations",
-#           "as": "location",
-#           "in": {
-#             "$concat": [
-#               "\"",
-#               "$$location",
-#               "\""
-#             ]
-#           }
-#         }
-#       }
+#       "items": 1
 #     }
 #   }
 # ]
-# Result: [{'storeLocations': ['"New York"', '"Denver"', '"Austin"', '"London"', '"San Diego"', '"Seattle"']}]
+# Result: [{'items': ['envelopes', 'notepad', 'pens', 'printer paper', 'binder', 'laptop', 'backpack']}]
 # Answere: 
-# Yes, you can get unique store locations from the given result. The unique store locations are: New York, Denver, Austin, London, San Diego, and Seattle.
+
+# Yes, you can get the names of all items available for purchase using the online method and that have not been used with a coupon. The items are envelopes, notepad, pens, printer paper, binder, laptop, and backpack.
+# ###############################################################################################################
